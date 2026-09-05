@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
       category: c.category,
       tags: c.tags,
       kind: c.kind,
+      aliases: c.aliases,
       isFavorite: c.isFavorite,
     })),
   );
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     category: body.category,
     tags: Array.isArray(body.tags) ? body.tags : [],
     kind: typeof body.kind === "string" ? body.kind : undefined,
+    aliases: Array.isArray(body.aliases) ? body.aliases : [],
   });
   return Response.json(card, { status: 201 });
 }

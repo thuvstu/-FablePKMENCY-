@@ -5,9 +5,10 @@ import { cards } from "@/db/schema";
 import { Markdown } from "@/components/Markdown";
 import DeleteCardButton from "@/components/DeleteCardButton";
 import FavoriteButton from "@/components/FavoriteButton";
-import { getCardBySlug, getCardContext } from "@/lib/cards";
+import CandidateActions from "@/components/CandidateActions";
+import { getCardBySlug, getCardContext, listCandidatesForCard } from "@/lib/cards";
 import { categoryClass, kindMeta, normalizeTitle, slugify } from "@/lib/wiki";
-import { History } from "lucide-react";
+import { History, Link2Icon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +50,10 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
   const card = await getCardBySlug(slug);
   if (!card) notFound();
 
-  const [ctx, all] = await Promise.all([
+  const [ctx, all, pendingForCard] = await Promise.all([
     getCardContext(card.id, card.category, card.tags),
     db.select({ title: cards.title, slug: cards.slug }).from(cards),
+    listCandidatesForCard(card.id),
   ]);
   const byTitle = new Map(all.map((c) => [normalizeTitle(c.title), c.slug]));
   const bySlug = new Set(all.map((c) => c.slug));
@@ -152,6 +154,35 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
 
         {/* Context */}
         <aside className="space-y-4">
+          {pendingForCard.length > 0 && (
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-800">
+                <Link2Icon size={12} /> 接続の候補（{pendingForCard.length}）
+              </h3>
+              <p className="mt-0.5 text-[11px] text-stone-500">承認すると知識グラフの辺になります</p>
+              <ul className="mt-2 space-y-2.5">
+                {pendingForCard.map((c) => {
+                  const outgoing = c.sourceId === card.id;
+                  return (
+                    <li key={c.id} className="rounded-lg bg-white p-2.5 ring-1 ring-emerald-200">
+                      <div className="text-sm">
+                        <Link
+                          href={`/wiki/${outgoing ? c.targetSlug : c.sourceSlug}`}
+                          className="font-serif font-semibold hover:text-[#b4532a]"
+                        >
+                          {outgoing ? c.targetTitle : c.sourceTitle}
+                        </Link>
+                        <span className="ml-1.5 text-[10px] text-stone-400">{outgoing ? "この項目からの参照" : "ここへの参照"}</span>
+                      </div>
+                      <div className="mt-1.5">
+                        <CandidateActions id={c.id} compact />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
           <MiniList title="被リンク" hint="このエントリを参照している項目" items={ctx.backlinks} />
           <MiniList title="リンク先" items={ctx.outgoing} />
           <MiniList title="関連項目" hint="カテゴリ・タグが共通" items={ctx.related} />

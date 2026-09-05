@@ -27,7 +27,7 @@ export default async function EditCardPage({ params }: { params: Promise<{ slug:
       <CardEditor
         mode="edit"
         cardId={card.id}
-        initial={{ title: card.title, summary: card.summary, content: card.content, category: card.category, tags: card.tags, kind: card.kind }}
+        initial={{ title: card.title, summary: card.summary, content: card.content, category: card.category, tags: card.tags, kind: card.kind, aliases: card.aliases }}
         categories={cats.map((c) => c.category)}
         allTitles={all}
       />

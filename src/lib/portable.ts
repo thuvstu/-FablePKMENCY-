@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { cards as cardsTable, whiteboardCards, whiteboardEdges, whiteboards } from "@/db/schema";
-import { createCard } from "./cards";
+import { cards as cardsTable, linkCandidates, links, whiteboardCards, whiteboardEdges, whiteboards } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { createCard, relinkAll } from "./cards";
 import { sql } from "drizzle-orm";
 
 // ---------------------------------------------------------------------------
@@ -16,6 +17,7 @@ type ExportCard = {
   category: string;
   tags: string[];
   kind: string;
+  aliases: string[];
   isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
@@ -27,9 +29,11 @@ export async function exportAll() {
   const boards = await db.select().from(whiteboards);
   const bCards = await db.select().from(whiteboardCards);
   const bEdges = await db.select().from(whiteboardEdges);
+  const linkRows = await db.select().from(links);
+  const candidateRows = await db.select().from(linkCandidates);
   return {
     app: "codex",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     cards: allCards.map(
       (c): ExportCard => ({
@@ -40,11 +44,19 @@ export async function exportAll() {
         category: c.category,
         tags: c.tags,
         kind: c.kind,
+        aliases: c.aliases,
         isFavorite: c.isFavorite,
         createdAt: c.createdAt.toISOString(),
         updatedAt: c.updatedAt.toISOString(),
       }),
     ),
+    // Approved link graph + pending/rejected candidates (approval workflow state).
+    links: linkRows.map((l) => ({ source: slugById.get(l.sourceId) ?? "", target: slugById.get(l.targetId) ?? "" })),
+    candidates: candidateRows.map((c) => ({
+      source: slugById.get(c.sourceId) ?? "",
+      target: slugById.get(c.targetId) ?? "",
+      status: c.status,
+    })),
     boards: boards.map((b) => ({
       name: b.name,
       description: b.description,
@@ -58,16 +70,21 @@ export async function exportAll() {
   };
 }
 
-export type ImportResult = { cards: number; boards: number; skipped: number; errors: string[] };
+export type ImportResult = { cards: number; boards: number; links: number; candidates: number; skipped: number; errors: string[] };
 
 /** Import our export format, or a plain array of {title, content, ...}. */
 export async function importAll(payload: unknown): Promise<ImportResult> {
-  const result: ImportResult = { cards: 0, boards: 0, skipped: 0, errors: [] };
+  const result: ImportResult = { cards: 0, boards: 0, links: 0, candidates: 0, skipped: 0, errors: [] };
   const data = (payload ?? {}) as {
     cards?: Partial<ExportCard>[];
+    links?: { source?: string; target?: string }[];
+    candidates?: { source?: string; target?: string; status?: string }[];
     boards?: { name?: string; description?: string; cards?: { slug?: string; x?: number; y?: number; width?: number; color?: string }[]; edges?: { from?: string; to?: string; label?: string }[] }[];
   };
   const cardList = Array.isArray(data.cards) ? data.cards : Array.isArray(payload) ? (payload as Partial<ExportCard>[]) : [];
+  // Roundtrip fidelity (principle 1): links from an export are restored as
+  // already-approved; links inferred from plain arrays go through approval.
+  const hasApprovedLinks = Array.isArray(data.links);
 
   const existing = await db.select({ slug: cardsTable.slug, id: cardsTable.id }).from(cardsTable);
   const idBySlug = new Map(existing.map((e) => [e.slug, e.id]));
@@ -82,19 +99,70 @@ export async function importAll(payload: unknown): Promise<ImportResult> {
         result.skipped++;
         continue;
       }
-      const created = await createCard({
-        title: c.title,
-        summary: c.summary ?? "",
-        content: c.content ?? "",
-        category: c.category,
-        tags: Array.isArray(c.tags) ? c.tags : [],
-        kind: c.kind,
-      });
+      const created = await createCard(
+        {
+          title: c.title,
+          summary: c.summary ?? "",
+          content: c.content ?? "",
+          category: c.category,
+          tags: Array.isArray(c.tags) ? c.tags : [],
+          kind: c.kind,
+          aliases: Array.isArray(c.aliases) ? c.aliases : [],
+        },
+        // v3 exports carry explicit link state → approval happens below from
+        // the exported list, not from re-extraction.
+        { approveLinks: hasApprovedLinks, deferReferrers: true },
+      );
       idBySlug.set(created.slug, created.id);
       if (c.slug) idBySlug.set(c.slug, created.id); // alias old slug for board refs
       result.cards++;
     } catch (e) {
       result.errors.push(`${c?.title ?? "?"}: ${e instanceof Error ? e.message : "error"}`);
+    }
+  }
+
+  if (hasApprovedLinks && result.cards > 0) {
+    // Restore the approved link graph exactly as exported.
+    for (const l of data.links ?? []) {
+      if (!l.source || !l.target) continue;
+      const sourceId = idBySlug.get(l.source);
+      const targetId = idBySlug.get(l.target);
+      if (!sourceId || !targetId) continue;
+      await db.insert(links).values({ sourceId, targetId }).onConflictDoNothing();
+      result.links++;
+    }
+    // Approval supersedes extraction: a pending proposal must never survive
+    // for a pair that is now an approved link.
+    await db.execute(
+      sql`delete from link_candidates c using links l
+          where l.source_id = c.source_id and l.target_id = c.target_id
+            and c.status = 'pending'`,
+    );
+  } else if (result.cards > 0) {
+    // Legacy plain-array import: one proposal sweep now that all cards exist.
+    await relinkAll();
+  }
+
+  // Restore approval-workflow state (pending stays pending, rejected stays rejected).
+  for (const c of data.candidates ?? []) {
+    if (!c.source || !c.target) continue;
+    const sourceId = idBySlug.get(c.source);
+    const targetId = idBySlug.get(c.target);
+    if (!sourceId || !targetId) continue;
+    if (c.status === "approved") {
+      await db.insert(links).values({ sourceId, targetId }).onConflictDoNothing();
+      result.links++;
+      continue;
+    }
+    const status = c.status === "rejected" ? "rejected" : "pending";
+    const existing = await db
+      .select({ id: linkCandidates.id })
+      .from(linkCandidates)
+      .where(and(eq(linkCandidates.sourceId, sourceId), eq(linkCandidates.targetId, targetId)))
+      .limit(1);
+    if (!existing.length) {
+      await db.insert(linkCandidates).values({ sourceId, targetId, status }).onConflictDoNothing();
+      result.candidates++;
     }
   }
 
@@ -153,6 +221,7 @@ export async function toSqliteDump(): Promise<string> {
     "  updated_at TEXT NOT NULL",
     ");",
     "CREATE TABLE IF NOT EXISTS links (id INTEGER PRIMARY KEY AUTOINCREMENT, source_slug TEXT NOT NULL, target_slug TEXT NOT NULL);",
+    "CREATE TABLE IF NOT EXISTS link_candidates (id INTEGER PRIMARY KEY AUTOINCREMENT, source_slug TEXT NOT NULL, target_slug TEXT NOT NULL, similarity REAL, status TEXT NOT NULL DEFAULT 'pending');",
     "CREATE TABLE IF NOT EXISTS whiteboards (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '');",
     "CREATE TABLE IF NOT EXISTS whiteboard_cards (id INTEGER PRIMARY KEY AUTOINCREMENT, whiteboard_id INTEGER NOT NULL, card_slug TEXT NOT NULL, x REAL, y REAL, width REAL, color TEXT);",
     "CREATE TABLE IF NOT EXISTS whiteboard_edges (id INTEGER PRIMARY KEY AUTOINCREMENT, whiteboard_id INTEGER NOT NULL, from_slug TEXT NOT NULL, to_slug TEXT NOT NULL, label TEXT NOT NULL DEFAULT '');",
@@ -167,6 +236,9 @@ export async function toSqliteDump(): Promise<string> {
     select s.slug as source, t.slug as target
     from links l join cards s on s.id = l.source_id join cards t on t.id = l.target_id`);
   for (const l of links.rows) out.push(`INSERT INTO links (source_slug,target_slug) VALUES (${lit(l.source)},${lit(l.target)});`);
+  for (const c of exp.candidates) {
+    out.push(`INSERT INTO link_candidates (source_slug,target_slug,similarity,status) VALUES (${lit(c.source)},${lit(c.target)},NULL,${lit(c.status)});`);
+  }
   exp.boards.forEach((b, i) => {
     out.push(`INSERT INTO whiteboards (id,name,description) VALUES (${i + 1},${lit(b.name)},${lit(b.description)});`);
     for (const p of b.cards) {

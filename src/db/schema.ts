@@ -24,6 +24,8 @@ export const cards = pgTable(
     category: text("category").notNull().default("General"),
     tags: text("tags").array().notNull().default([]),
     kind: text("kind").notNull().default("note"),
+    /** 別名・読み仮名・旧称 (PE entry_definition.reading 相当). 検索の表記揺れ対応。 */
+    aliases: text("aliases").array().notNull().default([]),
     isFavorite: boolean("is_favorite").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -32,6 +34,7 @@ export const cards = pgTable(
 );
 
 // Directed wiki-links extracted from [[Title]] syntax in card content.
+// (approved connections only — auto-extraction lands in link_candidates first)
 export const links = pgTable(
   "links",
   {
@@ -46,6 +49,31 @@ export const links = pgTable(
   (t) => [
     uniqueIndex("links_pair_idx").on(t.sourceId, t.targetId),
     index("links_target_idx").on(t.targetId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Approval gate (PE principle 2): automatic link extraction NEVER writes to
+// `links` directly. Proposals accumulate here as `pending`; only user
+// approval promotes them. `rejected` proposals are never re-proposed.
+// ---------------------------------------------------------------------------
+export const linkCandidates = pgTable(
+  "link_candidates",
+  {
+    id: serial("id").primaryKey(),
+    sourceId: integer("source_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    targetId: integer("target_id")
+      .notNull()
+      .references(() => cards.id, { onDelete: "cascade" }),
+    similarity: real("similarity"),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("link_candidates_pair_idx").on(t.sourceId, t.targetId),
+    index("link_candidates_status_idx").on(t.status),
   ],
 );
 
@@ -115,6 +143,7 @@ export const cardRevisions = pgTable(
     category: text("category").notNull().default("General"),
     tags: text("tags").array().notNull().default([]),
     kind: text("kind").notNull().default("note"),
+    aliases: text("aliases").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("revisions_card_idx").on(t.cardId)],
@@ -151,6 +180,7 @@ export const progressEvents = pgTable(
 
 export type Card = typeof cards.$inferSelect;
 export type NewCard = typeof cards.$inferInsert;
+export type LinkCandidate = typeof linkCandidates.$inferSelect;
 export type CardRevision = typeof cardRevisions.$inferSelect;
 export type Review = typeof reviews.$inferSelect;
 export type Whiteboard = typeof whiteboards.$inferSelect;

@@ -425,7 +425,7 @@ export async function seedIfEmpty() {
 
   const idByTitle = new Map<string, number>();
   for (const c of SEED) {
-    const card = await createCard(c);
+    const card = await createCard(c, { approveLinks: true });
     idByTitle.set(c.title, card.id);
   }
 

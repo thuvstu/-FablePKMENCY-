@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, LayoutDashboard, Network, GraduationCap, BarChart3, Shuffle, Search, Plus } from "lucide-react";
+import { BookOpen, LayoutDashboard, Network, GraduationCap, BarChart3, Shuffle, Search, Plus, Link2 } from "lucide-react";
 
 const items = [
   { href: "/", label: "百科事典", icon: BookOpen },
   { href: "/boards", label: "ボード", icon: LayoutDashboard },
   { href: "/graph", label: "グラフ", icon: Network },
-  { href: "/review", label: "復習", icon: GraduationCap, badge: true },
+  { href: "/review", label: "復習", icon: GraduationCap, badge: "review" as const },
+  { href: "/connections", label: "接続", icon: Link2, badge: "candidates" as const },
   { href: "/stats", label: "統計", icon: BarChart3 },
 ];
 
@@ -18,11 +19,16 @@ export default function Nav() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [due, setDue] = useState<number | null>(null);
+  const [pendingCandidates, setPendingCandidates] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/review")
       .then((r) => r.json())
       .then((d) => setDue(d.due?.length ?? 0))
+      .catch(() => {});
+    fetch("/api/candidates")
+      .then((r) => r.json())
+      .then((d) => setPendingCandidates(d.count ?? 0))
       .catch(() => {});
   }, [pathname]);
 
@@ -50,9 +56,14 @@ export default function Nav() {
               >
                 <it.icon size={14} />
                 {it.label}
-                {it.badge && due !== null && due > 0 && (
+                {it.badge === "review" && due !== null && due > 0 && (
                   <span className="grid h-4 min-w-4 place-items-center rounded-full bg-[#b4532a] px-1 text-[10px] font-semibold text-white">
                     {due > 99 ? "99+" : due}
+                  </span>
+                )}
+                {it.badge === "candidates" && pendingCandidates !== null && pendingCandidates > 0 && (
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+                    {pendingCandidates > 99 ? "99+" : pendingCandidates}
                   </span>
                 )}
               </Link>

@@ -8,7 +8,7 @@ import { KINDS, normalizeTitle, slugify } from "@/lib/wiki";
 type Props = {
   mode: "create" | "edit";
   cardId?: number;
-  initial: { title: string; summary: string; content: string; category: string; tags: string[]; kind?: string };
+  initial: { title: string; summary: string; content: string; category: string; tags: string[]; kind?: string; aliases?: string[] };
   categories: string[];
   allTitles: { title: string; slug: string }[];
 };
@@ -20,6 +20,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
   const [content, setContent] = useState(initial.content);
   const [category, setCategory] = useState(initial.category);
   const [kind, setKind] = useState(initial.kind ?? "note");
+  const [aliases, setAliases] = useState((initial.aliases ?? []).join(", "));
   const [tags, setTags] = useState(initial.tags.join(", "));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +95,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
       content,
       category,
       kind,
+      aliases: aliases.split(",").map((a) => a.trim()).filter(Boolean),
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
     };
     const res = await fetch(mode === "create" ? "/api/cards" : `/api/cards/${cardId}`, {
@@ -164,6 +166,17 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
               className="w-full rounded-lg border border-[#ddd5c7] bg-white px-3 py-2 text-sm outline-none focus:border-[#b4532a]"
             />
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">
+            別名・読み（カンマ区切り・検索の表記揺れに使う）
+          </label>
+          <input
+            value={aliases}
+            onChange={(e) => setAliases(e.target.value)}
+            placeholder="WW1, 世界大戦, 第一次大戦"
+            className="w-full rounded-lg border border-[#ddd5c7] bg-white px-3 py-2 text-sm outline-none focus:border-[#b4532a]"
+          />
         </div>
 
         <div className="relative">

@@ -4,8 +4,9 @@ import { cards } from "@/db/schema";
 import { sql } from "drizzle-orm";
 import { getStats, listCards } from "@/lib/cards";
 import { seedIfEmpty } from "@/lib/seed";
+import { getDueQueue } from "@/lib/srs";
 import { categoryClass, kindMeta } from "@/lib/wiki";
-import { Star } from "lucide-react";
+import { Star, GraduationCap, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +26,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   await seedIfEmpty();
   const sp = await searchParams;
   const filtering = Boolean(sp.q || sp.category || sp.tag || sp.letter || sp.kind || sp.fav);
-  const [stats, entries, kindRows] = await Promise.all([
+  const [stats, entries, kindRows, dueInfo] = await Promise.all([
     getStats(),
     listCards({ q: sp.q, category: sp.category, tag: sp.tag, letter: sp.letter, kind: sp.kind, favorite: sp.fav === "1" }),
     db.select({ kind: cards.kind, count: sql<number>`count(*)::int` }).from(cards).groupBy(cards.kind),
+    getDueQueue(),
   ]);
 
   const grouped = new Map<string, typeof entries>();
@@ -48,6 +50,21 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
+      {dueInfo.due.length > 0 && (
+        <Link
+          href="/review"
+          className="mb-6 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 transition hover:bg-amber-100"
+        >
+          <GraduationCap size={16} className="shrink-0 text-amber-700" />
+          <span>
+            <span className="font-semibold">{dueInfo.due.length} 枚</span>
+            のカードが復習期限です。忘れる前に引き出しましょう。
+          </span>
+          <span className="ml-auto flex items-center gap-1 text-xs font-medium text-amber-800">
+            復習を始める <ArrowRight size={12} />
+          </span>
+        </Link>
+      )}
       {/* Masthead */}
       <section className="mb-8 border-b border-[#e6e0d4] pb-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
