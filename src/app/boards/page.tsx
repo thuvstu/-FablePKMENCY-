@@ -28,10 +28,10 @@ export default async function BoardsPage() {
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Spatial thinking</p>
-          <h1 className="font-serif text-4xl font-semibold tracking-tight">Whiteboards</h1>
+          <p className="text-xs uppercase tracking-[0.2em] text-stone-500">空間としての思考</p>
+          <h1 className="font-serif text-4xl font-semibold tracking-tight">ホワイトボード</h1>
           <p className="mt-1 max-w-xl text-stone-600">
-            Infinite canvases. Drop encyclopedia entries onto them, drag them around, and draw labelled connections.
+            無限キャンバス。百科事典の項目を配置し、ドラッグで並べ替え、関係を線で結ぶ。
           </p>
         </div>
         <NewBoardForm />
@@ -56,10 +56,10 @@ export default async function BoardsPage() {
             </div>
             <div className="p-4">
               <h2 className="font-serif text-lg font-semibold leading-tight group-hover:text-[#b4532a]">{b.name}</h2>
-              <p className="mt-1 line-clamp-2 text-sm text-stone-600">{b.description || "No description."}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-stone-600">{b.description || "説明なし"}</p>
               <div className="mt-3 flex gap-3 text-xs text-stone-400">
-                <span>{b.cardCount} cards</span>
-                <span>{b.edgeCount} connections</span>
+                <span>{b.cardCount} カード</span>
+                <span>{b.edgeCount} 接続</span>
                 <span className="ml-auto">{new Date(b.updatedAt).toLocaleDateString()}</span>
               </div>
             </div>

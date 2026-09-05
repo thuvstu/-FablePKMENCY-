@@ -13,7 +13,7 @@ export default async function NewCardPage({ searchParams }: { searchParams: Prom
   ]);
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
-      <h1 className="mb-6 font-serif text-3xl font-semibold">New entry</h1>
+      <h1 className="mb-6 font-serif text-3xl font-semibold">新規エントリ</h1>
       <CardEditor
         mode="create"
         initial={{ title: title ?? "", summary: "", content: title ? `# ${title}\n\n` : "", category: "General", tags: [] }}

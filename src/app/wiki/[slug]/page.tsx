@@ -4,8 +4,10 @@ import { db } from "@/db";
 import { cards } from "@/db/schema";
 import { Markdown } from "@/components/Markdown";
 import DeleteCardButton from "@/components/DeleteCardButton";
+import FavoriteButton from "@/components/FavoriteButton";
 import { getCardBySlug, getCardContext } from "@/lib/cards";
-import { categoryClass, normalizeTitle, slugify } from "@/lib/wiki";
+import { categoryClass, kindMeta, normalizeTitle, slugify } from "@/lib/wiki";
+import { History } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +22,12 @@ function MiniList({
 }) {
   return (
     <section className="rounded-xl border border-[#e6e0d4] bg-white p-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
         {title} <span className="text-stone-400">({items.length})</span>
       </h3>
       {hint && <p className="mt-0.5 text-[11px] text-stone-400">{hint}</p>}
       {items.length === 0 ? (
-        <p className="mt-2 text-sm text-stone-400">None yet.</p>
+        <p className="mt-2 text-sm text-stone-400">まだありません。</p>
       ) : (
         <ul className="mt-2 space-y-2">
           {items.map((c) => (
@@ -67,7 +69,7 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-4 flex items-center gap-2 text-sm text-stone-500">
         <Link href="/" className="hover:text-[#b4532a]">
-          Encyclopedia
+          百科事典
         </Link>
         <span>/</span>
         <Link href={`/?category=${encodeURIComponent(card.category)}`} className="hover:text-[#b4532a]">
@@ -82,9 +84,9 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
         <aside className="hidden lg:block">
           <div className="sticky top-20 space-y-4">
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Contents</h3>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">目次</h3>
               {headings.length === 0 ? (
-                <p className="text-xs text-stone-400">No sections.</p>
+                <p className="text-xs text-stone-400">セクションなし。</p>
               ) : (
                 <ul className="space-y-1 border-l border-[#e6e0d4] text-sm">
                   {headings.map((h, i) => (
@@ -98,8 +100,8 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
               )}
             </div>
             <div className="text-xs text-stone-400">
-              <div>Created {new Date(card.createdAt).toLocaleDateString()}</div>
-              <div>Updated {new Date(card.updatedAt).toLocaleDateString()}</div>
+              <div>作成 {new Date(card.createdAt).toLocaleDateString("ja-JP")}</div>
+              <div>更新 {new Date(card.updatedAt).toLocaleDateString("ja-JP")}</div>
             </div>
           </div>
         </aside>
@@ -107,6 +109,10 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
         {/* Article */}
         <article className="min-w-0 rounded-2xl border border-[#e6e0d4] bg-white p-6 shadow-sm sm:p-10">
           <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${kindMeta(card.kind).className}`}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: kindMeta(card.kind).dot }} />
+              {kindMeta(card.kind).label}
+            </span>
             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${categoryClass(card.category)}`}>{card.category}</span>
             {card.tags.map((t) => (
               <Link key={t} href={`/?tag=${encodeURIComponent(t)}`} className="rounded-full border border-[#ddd5c7] px-2 py-0.5 text-xs text-stone-600 hover:border-[#b4532a] hover:text-[#b4532a]">
@@ -114,8 +120,16 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
               </Link>
             ))}
             <div className="ml-auto flex items-center gap-2">
+              <FavoriteButton id={card.id} initial={card.isFavorite} />
+              <Link
+                href={`/wiki/${card.slug}/history`}
+                title="履歴を見る"
+                className="rounded-md border border-[#ddd5c7] px-2 py-1 text-stone-500 hover:bg-[#faf7f1]"
+              >
+                <History size={15} />
+              </Link>
               <Link href={`/wiki/${card.slug}/edit`} className="rounded-md border border-[#ddd5c7] px-3 py-1 text-sm hover:bg-[#faf7f1]">
-                Edit
+                編集
               </Link>
               <DeleteCardButton id={card.id} title={card.title} />
             </div>
@@ -127,22 +141,27 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
           {card.content.trim() ? (
             <Markdown content={card.content} resolve={resolve} />
           ) : (
-            <p className="text-stone-400">This entry is empty. <Link href={`/wiki/${card.slug}/edit`} className="text-[#b4532a] underline">Write it.</Link></p>
+            <p className="text-stone-400">
+              このエントリはまだ空です。{" "}
+              <Link href={`/wiki/${card.slug}/edit`} className="text-[#b4532a] underline">
+                執筆する
+              </Link>
+            </p>
           )}
         </article>
 
         {/* Context */}
         <aside className="space-y-4">
-          <MiniList title="Linked from" hint="Backlinks — entries that reference this one" items={ctx.backlinks} />
-          <MiniList title="Links to" items={ctx.outgoing} />
-          <MiniList title="Related" hint="Shared category or tags" items={ctx.related} />
+          <MiniList title="被リンク" hint="このエントリを参照している項目" items={ctx.backlinks} />
+          <MiniList title="リンク先" items={ctx.outgoing} />
+          <MiniList title="関連項目" hint="カテゴリ・タグが共通" items={ctx.related} />
           <section className="rounded-xl border border-[#e6e0d4] bg-white p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">On whiteboards</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">ホワイトボード</h3>
             {ctx.boards.length === 0 ? (
               <p className="mt-2 text-sm text-stone-400">
-                Not placed yet.{" "}
+                未配置。{" "}
                 <Link href="/boards" className="text-[#b4532a] hover:underline">
-                  Open a board →
+                  ボードを開く →
                 </Link>
               </p>
             ) : (

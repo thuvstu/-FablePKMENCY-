@@ -14,10 +14,10 @@ export default async function GraphPage() {
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-stone-500">Every [[link]] is an edge</p>
-        <h1 className="font-serif text-4xl font-semibold tracking-tight">Knowledge graph</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-stone-500">すべての [[リンク]] が辺になる</p>
+        <h1 className="font-serif text-4xl font-semibold tracking-tight">知識グラフ</h1>
         <p className="mt-1 text-stone-600">
-          {nodes.length} entries · {edges.length} links. Node size reflects how many entries connect to it. Hover to highlight neighbours, drag to rearrange, click to open.
+          {nodes.length} 項目 · {edges.length} リンク。ノードの大きさは接続数。ホバーで隣接ノードを強調、ドラッグで移動、クリックで項目を開く。
         </p>
       </div>
       <GraphView nodes={nodes} edges={edges} />

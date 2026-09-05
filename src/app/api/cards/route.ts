@@ -11,7 +11,16 @@ export async function GET(req: NextRequest) {
     tag: sp.get("tag") ?? undefined,
   });
   return Response.json(
-    rows.map((c) => ({ id: c.id, title: c.title, slug: c.slug, summary: c.summary, category: c.category, tags: c.tags })),
+    rows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      slug: c.slug,
+      summary: c.summary,
+      category: c.category,
+      tags: c.tags,
+      kind: c.kind,
+      isFavorite: c.isFavorite,
+    })),
   );
 }
 
@@ -26,6 +35,7 @@ export async function POST(req: Request) {
     content: body.content,
     category: body.category,
     tags: Array.isArray(body.tags) ? body.tags : [],
+    kind: typeof body.kind === "string" ? body.kind : undefined,
   });
   return Response.json(card, { status: 201 });
 }

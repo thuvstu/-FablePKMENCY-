@@ -3,12 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "./Markdown";
-import { normalizeTitle, slugify } from "@/lib/wiki";
+import { KINDS, normalizeTitle, slugify } from "@/lib/wiki";
 
 type Props = {
   mode: "create" | "edit";
   cardId?: number;
-  initial: { title: string; summary: string; content: string; category: string; tags: string[] };
+  initial: { title: string; summary: string; content: string; category: string; tags: string[]; kind?: string };
   categories: string[];
   allTitles: { title: string; slug: string }[];
 };
@@ -19,6 +19,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
   const [summary, setSummary] = useState(initial.summary);
   const [content, setContent] = useState(initial.content);
   const [category, setCategory] = useState(initial.category);
+  const [kind, setKind] = useState(initial.kind ?? "note");
   const [tags, setTags] = useState(initial.tags.join(", "));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +83,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
 
   async function save() {
     if (!title.trim()) {
-      setError("A title is required.");
+      setError("タイトルは必須です。");
       return;
     }
     setSaving(true);
@@ -92,6 +93,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
       summary,
       content,
       category,
+      kind,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
     };
     const res = await fetch(mode === "create" ? "/api/cards" : `/api/cards/${cardId}`, {
@@ -115,18 +117,32 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Entry title"
+          placeholder="項目名"
           className="w-full rounded-lg border border-[#ddd5c7] bg-white px-4 py-3 font-serif text-2xl font-semibold outline-none focus:border-[#b4532a]"
         />
         <input
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="One-sentence summary (shown in the index)"
+          placeholder="一文要約（索引・フラッシュカードの表に表示）"
           className="w-full rounded-lg border border-[#ddd5c7] bg-white px-4 py-2 text-sm outline-none focus:border-[#b4532a]"
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Category</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">型</label>
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value)}
+              className="w-full rounded-lg border border-[#ddd5c7] bg-white px-3 py-2 text-sm outline-none focus:border-[#b4532a]"
+            >
+              {KINDS.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">カテゴリ</label>
             <input
               list="categories"
               value={category}
@@ -140,7 +156,7 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
             </datalist>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">Tags (comma separated)</label>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-stone-500">タグ（カンマ区切り）</label>
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
@@ -152,9 +168,9 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
 
         <div className="relative">
           <div className="mb-1 flex items-center justify-between">
-            <label className="text-xs font-medium uppercase tracking-wider text-stone-500">Content (Markdown)</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-stone-500">本文（Markdown）</label>
             <span className="text-[11px] text-stone-400">
-              Type <code>[[</code> to link an entry · ⌘S to save
+              <code>[[</code> でリンク挿入 · ⌘S で保存
             </span>
           </div>
           <textarea
@@ -178,15 +194,15 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
             }}
             rows={22}
             spellCheck={false}
-            placeholder={"# Title\n\nWrite in Markdown. Link to other entries with [[Entry Title]]."}
+            placeholder={"# タイトル\n\nMarkdown で執筆。[[項目名]] で他のエントリへリンク。"}
             className="w-full resize-y rounded-lg border border-[#ddd5c7] bg-white px-4 py-3 font-mono text-sm leading-relaxed outline-none focus:border-[#b4532a]"
           />
           {suggest.open && (
             <div className="absolute left-4 top-full z-20 -mt-1 w-80 rounded-lg border border-[#ddd5c7] bg-white p-1 shadow-xl">
-              <div className="px-2 py-1 text-[11px] uppercase tracking-wider text-stone-400">Link to entry</div>
+              <div className="px-2 py-1 text-[11px] uppercase tracking-wider text-stone-400">リンク先の項目</div>
               {matches.length === 0 ? (
                 <div className="px-2 py-1.5 text-sm text-stone-500">
-                  No match — <span className="text-red-700">[[{suggest.query}]]</span> will be a red link.
+                  一致なし — <span className="text-red-700">[[{suggest.query}]]</span> は赤リンクになります。
                 </div>
               ) : (
                 matches.map((m, i) => (
@@ -215,20 +231,20 @@ export default function CardEditor({ mode, cardId, initial, categories, allTitle
             disabled={saving}
             className="rounded-lg bg-[#b4532a] px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#9a4522] disabled:opacity-50"
           >
-            {saving ? "Saving…" : mode === "create" ? "Create entry" : "Save changes"}
+            {saving ? "保存中…" : mode === "create" ? "作成する" : "変更を保存"}
           </button>
           <button onClick={() => router.back()} className="rounded-lg px-4 py-2 text-sm text-stone-600 hover:bg-[#ece6da]">
-            Cancel
+            キャンセル
           </button>
           <label className="ml-auto flex items-center gap-2 text-sm text-stone-600 lg:hidden">
-            <input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> Preview
+            <input type="checkbox" checked={preview} onChange={(e) => setPreview(e.target.checked)} /> プレビュー
           </label>
         </div>
       </div>
 
       <div className={`${preview ? "" : "hidden lg:block"} rounded-2xl border border-[#e6e0d4] bg-white p-6 sm:p-8`}>
-        <div className="mb-4 text-[11px] uppercase tracking-wider text-stone-400">Live preview</div>
-        {!/^#\s+/m.test(content) && <h1 className="mb-2 font-serif text-3xl font-semibold">{title || "Untitled"}</h1>}
+        <div className="mb-4 text-[11px] uppercase tracking-wider text-stone-400">ライブプレビュー</div>
+        {!/^#\s+/m.test(content) && <h1 className="mb-2 font-serif text-3xl font-semibold">{title || "無題"}</h1>}
         {summary && <p className="mb-4 font-serif italic text-stone-600">{summary}</p>}
         <Markdown content={content} resolve={resolve} />
       </div>

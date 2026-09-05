@@ -16,7 +16,7 @@ export default function NewBoardForm() {
         onClick={() => setOpen(true)}
         className="rounded-lg bg-[#1f1b16] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-black"
       >
-        + New whiteboard
+        + 新しいホワイトボード
       </button>
     );
   }
@@ -44,21 +44,21 @@ export default function NewBoardForm() {
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Board name — start with a question"
+        placeholder="ボード名 — 問いから始めるのがおすすめ"
         className="rounded-md border border-[#ddd5c7] px-3 py-2 text-sm outline-none focus:border-[#b4532a]"
       />
       <input
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description (optional)"
+        placeholder="説明（任意）"
         className="rounded-md border border-[#ddd5c7] px-3 py-2 text-sm outline-none focus:border-[#b4532a]"
       />
       <div className="flex gap-2">
         <button disabled={busy} className="rounded-md bg-[#b4532a] px-3 py-1.5 text-sm text-white disabled:opacity-50">
-          {busy ? "Creating…" : "Create"}
+          {busy ? "作成中…" : "作成"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-[#ece6da]">
-          Cancel
+          キャンセル
         </button>
       </div>
     </form>

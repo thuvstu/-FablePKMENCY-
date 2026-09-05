@@ -52,3 +52,24 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export function categoryClass(cat: string) {
   return CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.General;
 }
+
+// ---------------------------------------------------------------------------
+// Entry kinds (PersonalEncyclopedia's 13-type model, distilled for cards)
+// ---------------------------------------------------------------------------
+export const KINDS = [
+  { id: "note", label: "ノート", className: "bg-stone-100 text-stone-700 ring-stone-300", dot: "#78716c" },
+  { id: "word", label: "単語・定義", className: "bg-sky-100 text-sky-800 ring-sky-300", dot: "#0284c7" },
+  { id: "person", label: "人物", className: "bg-amber-100 text-amber-800 ring-amber-300", dot: "#d97706" },
+  { id: "place", label: "場所", className: "bg-emerald-100 text-emerald-800 ring-emerald-300", dot: "#059669" },
+  { id: "event", label: "出来事", className: "bg-rose-100 text-rose-800 ring-rose-300", dot: "#e11d48" },
+  { id: "work", label: "書籍・作品", className: "bg-orange-100 text-orange-800 ring-orange-300", dot: "#ea580c" },
+  { id: "link", label: "Web・資料", className: "bg-cyan-100 text-cyan-800 ring-cyan-300", dot: "#0891b2" },
+  { id: "quote", label: "引用", className: "bg-violet-100 text-violet-800 ring-violet-300", dot: "#7c3aed" },
+  { id: "idea", label: "アイデア", className: "bg-yellow-100 text-yellow-800 ring-yellow-300", dot: "#ca8a04" },
+] as const;
+
+export type KindId = (typeof KINDS)[number]["id"];
+
+export function kindMeta(id: string) {
+  return KINDS.find((k) => k.id === id) ?? KINDS[0];
+}

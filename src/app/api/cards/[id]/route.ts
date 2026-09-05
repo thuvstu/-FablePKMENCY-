@@ -27,6 +27,8 @@ export async function PUT(req: Request, { params }: Ctx) {
     content: body.content,
     category: body.category,
     tags: Array.isArray(body.tags) ? body.tags : undefined,
+    kind: typeof body.kind === "string" ? body.kind : undefined,
+    isFavorite: typeof body.isFavorite === "boolean" ? body.isFavorite : undefined,
   });
   if (!card) return Response.json({ error: "Not found" }, { status: 404 });
   return Response.json(card);

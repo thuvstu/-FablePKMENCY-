@@ -19,15 +19,15 @@ export default async function EditCardPage({ params }: { params: Promise<{ slug:
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex items-baseline gap-3">
-        <h1 className="font-serif text-3xl font-semibold">Edit entry</h1>
+        <h1 className="font-serif text-3xl font-semibold">エントリを編集</h1>
         <Link href={`/wiki/${card.slug}`} className="text-sm text-stone-500 hover:text-[#b4532a]">
-          ← back to {card.title}
+          ← {card.title} に戻る
         </Link>
       </div>
       <CardEditor
         mode="edit"
         cardId={card.id}
-        initial={{ title: card.title, summary: card.summary, content: card.content, category: card.category, tags: card.tags }}
+        initial={{ title: card.title, summary: card.summary, content: card.content, category: card.category, tags: card.tags, kind: card.kind }}
         categories={cats.map((c) => c.category)}
         allTitles={all}
       />

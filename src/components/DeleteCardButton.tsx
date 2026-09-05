@@ -10,7 +10,7 @@ export default function DeleteCardButton({ id, title }: { id: number; title: str
     <button
       disabled={busy}
       onClick={async () => {
-        if (!confirm(`Delete “${title}”? Links pointing here will become red links.`)) return;
+        if (!confirm(`「${title}」を削除します。ここへのリンクは赤リンクになります。よろしいですか？`)) return;
         setBusy(true);
         await fetch(`/api/cards/${id}`, { method: "DELETE" });
         router.push("/");

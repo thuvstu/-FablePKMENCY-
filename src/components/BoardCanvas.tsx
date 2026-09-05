@@ -267,7 +267,7 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
   async function addEdge(from: number, to: number) {
     setConnectFrom(null);
     if (edges.some((e) => e.fromCardId === from && e.toCardId === to)) return;
-    const label = window.prompt("Name the relationship (optional):", "") ?? "";
+    const label = window.prompt("関係の名前（任意）:", "") ?? "";
     const res = await fetch(`/api/boards/${board.id}/edges`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -280,7 +280,7 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
   }
 
   async function editEdge(edge: Edge) {
-    const label = window.prompt("Edge label (leave empty and OK to keep, type 'delete' to remove):", edge.label);
+    const label = window.prompt("接続のラベル（'delete' と入力で削除）:", edge.label);
     if (label === null) return;
     if (label.trim().toLowerCase() === "delete") {
       setEdges((es) => es.filter((e) => e.id !== edge.id));
@@ -299,7 +299,7 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
   }
 
   async function deleteBoard() {
-    if (!confirm(`Delete board “${board.name}”? Cards themselves are kept.`)) return;
+    if (!confirm(`ボード「${board.name}」を削除します。カード自体は残ります。よろしいですか？`)) return;
     await fetch(`/api/boards/${board.id}`, { method: "DELETE" });
     router.push("/boards");
     router.refresh();
@@ -352,11 +352,11 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
         {sidebarOpen && (
           <>
             <div className="border-b border-[#e6e0d4] p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">Card library</div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-stone-500">カードライブラリ</div>
               <input
                 value={libQ}
                 onChange={(e) => setLibQ(e.target.value)}
-                placeholder="Search entries to place…"
+                placeholder="配置するエントリを検索…"
                 className="w-full rounded-md border border-[#ddd5c7] px-3 py-1.5 text-sm outline-none focus:border-[#b4532a]"
               />
               <form
@@ -369,7 +369,7 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
                 <input
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="New card title…"
+                  placeholder="新しいカードの項目名…"
                   className="min-w-0 flex-1 rounded-md border border-[#ddd5c7] px-3 py-1.5 text-sm outline-none focus:border-[#b4532a]"
                 />
                 <button className="rounded-md bg-[#b4532a] px-2.5 text-sm text-white hover:bg-[#9a4522]">+</button>
@@ -388,14 +388,14 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
                     >
                       <div className="flex items-center gap-2">
                         <span className="truncate font-serif text-sm font-semibold">{c.title}</span>
-                        {on && <span className="ml-auto text-[10px] text-stone-400">on board</span>}
+                        {on && <span className="ml-auto text-[10px] text-stone-400">配置済み</span>}
                       </div>
                       <div className="line-clamp-1 text-xs text-stone-500">{c.summary}</div>
                     </button>
                   </li>
                 );
               })}
-              {lib.length === 0 && <li className="p-3 text-sm text-stone-400">No cards match.</li>}
+              {lib.length === 0 && <li className="p-3 text-sm text-stone-400">一致するカードがありません。</li>}
             </ul>
           </>
         )}
@@ -408,13 +408,13 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
           <button
             onClick={() => setSidebarOpen((s) => !s)}
             className="rounded-md border border-[#ddd5c7] bg-white px-2 py-1.5 text-sm shadow-sm hover:bg-[#faf7f1]"
-            title="Toggle library"
+            title="ライブラリ表示切替"
           >
             {sidebarOpen ? "◀" : "▶"}
           </button>
           <div className="flex items-center gap-2 rounded-md border border-[#ddd5c7] bg-white px-3 py-1.5 shadow-sm">
             <Link href="/boards" className="text-xs text-stone-500 hover:text-[#b4532a]">
-              Boards /
+              ボード /
             </Link>
             <input
               value={name}
@@ -432,11 +432,11 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
             className={`rounded-md border px-3 py-1.5 text-sm shadow-sm ${
               connectMode ? "border-[#b4532a] bg-[#b4532a] text-white" : "border-[#ddd5c7] bg-white hover:bg-[#faf7f1]"
             }`}
-            title="Connect cards (C)"
+            title="カードをつなぐ (C)"
           >
-            ⟶ Connect{connectMode && (connectFrom ? ": pick target" : ": pick source")}
+            つなぐ{connectMode && (connectFrom ? "：接続先を選択" : "：接続元を選択")}
           </button>
-          <span className="text-xs text-stone-400">{saving ? "Saving…" : "Saved"}</span>
+          <span className="text-xs text-stone-400">{saving ? "保存中…" : "保存済み"}</span>
         </div>
 
         <div className="absolute right-3 top-3 z-20 flex items-center gap-1">
@@ -451,13 +451,13 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
             Fit
           </button>
           <button onClick={deleteBoard} className="ml-2 rounded-md border border-[#ddd5c7] bg-white px-2.5 py-1.5 text-sm text-stone-500 shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700">
-            Delete board
+            ボードを削除
           </button>
         </div>
 
         {/* Help */}
         <div className="pointer-events-none absolute bottom-3 left-3 z-20 rounded-md bg-white/80 px-3 py-1.5 text-[11px] text-stone-500 shadow-sm backdrop-blur">
-          Drag background to pan · ⌘/Ctrl + scroll to zoom · Drag card header to move · <kbd>C</kbd> connect · <kbd>F</kbd> fit · <kbd>Del</kbd> remove
+          背景ドラッグで移動 · ⌘/Ctrl+スクロールでズーム · カードをドラッグで移動 · <kbd>C</kbd> 接続 · <kbd>F</kbd> 全体表示 · <kbd>Del</kbd> 外す
         </div>
 
         {/* Selected card inspector */}
@@ -477,10 +477,10 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
             </div>
             <div className="flex flex-wrap gap-1.5 text-xs">
               <Link href={`/wiki/${selectedCard.slug}`} className="rounded-md border border-[#ddd5c7] px-2 py-1 hover:bg-[#faf7f1]">
-                Open entry
+                項目を開く
               </Link>
               <Link href={`/wiki/${selectedCard.slug}/edit`} className="rounded-md border border-[#ddd5c7] px-2 py-1 hover:bg-[#faf7f1]">
-                Edit
+                編集
               </Link>
               <button
                 onClick={() => {
@@ -489,10 +489,10 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
                 }}
                 className="rounded-md border border-[#ddd5c7] px-2 py-1 hover:bg-[#faf7f1]"
               >
-                Connect from
+                ここからつなぐ
               </button>
               <button onClick={() => removeFromBoard(selectedCard.cardId)} className="rounded-md border border-transparent px-2 py-1 text-red-700 hover:bg-red-50">
-                Remove
+                外す
               </button>
             </div>
           </div>
@@ -596,8 +596,8 @@ export default function BoardCanvas({ board, initialCards, initialEdges, allTitl
 
             {placed.length === 0 && (
               <div className="absolute left-40 top-40 w-96 rounded-2xl border border-dashed border-[#c9c0b0] bg-white/70 p-6 text-center text-stone-500">
-                <div className="font-serif text-lg font-semibold text-stone-700">Empty board</div>
-                <p className="mt-1 text-sm">Pick entries from the library on the left, or create a new card to start thinking spatially.</p>
+                <div className="font-serif text-lg font-semibold text-stone-700">空のボード</div>
+                <p className="mt-1 text-sm">左のライブラリからエントリを配置するか、新しいカードを作成して、空間的に考え始めましょう。</p>
               </div>
             )}
           </div>

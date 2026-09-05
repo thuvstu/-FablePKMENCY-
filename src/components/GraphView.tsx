@@ -172,7 +172,7 @@ export default function GraphView({
         <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-[#1f1b16] px-3 py-2 text-sm text-white shadow-lg">
           <div className="font-serif font-semibold">{hoverNode.title}</div>
           <div className="text-xs opacity-70">
-            {hoverNode.category} · {hoverNode.deg} link{hoverNode.deg === 1 ? "" : "s"} · click to open
+            {hoverNode.category} · {hoverNode.deg} リンク · クリックで開く
           </div>
         </div>
       )}

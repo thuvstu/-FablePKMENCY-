@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { cards, links, whiteboardCards, whiteboards } from "@/db/schema";
+import { cardRevisions, cards, links, progressEvents, whiteboardCards, whiteboards } from "@/db/schema";
 import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { extractWikiLinks, normalizeTitle, slugify } from "./wiki";
 
@@ -9,7 +9,28 @@ export type CardInput = {
   content?: string;
   category?: string;
   tags?: string[];
+  kind?: string;
 };
+
+export type EventType = "created" | "edited" | "reviewed" | "connected";
+
+/** Append to the unbounded activity log (feeds streaks / heatmap). */
+export async function logEvent(type: EventType, cardId?: number) {
+  await db.insert(progressEvents).values({ type, cardId: cardId ?? null });
+}
+
+/** Immutable snapshot used for history & restore. */
+async function snapshot(card: typeof cards.$inferSelect) {
+  await db.insert(cardRevisions).values({
+    cardId: card.id,
+    title: card.title,
+    summary: card.summary,
+    content: card.content,
+    category: card.category,
+    tags: card.tags,
+    kind: card.kind,
+  });
+}
 
 async function uniqueSlug(title: string, excludeId?: number) {
   const base = slugify(title);
@@ -68,6 +89,13 @@ export async function relinkReferrers(title: string) {
   for (const r of referrers) await syncLinks(r.id, r.content);
 }
 
+/** Rebuild the entire link graph (maintenance operation). */
+export async function relinkAll() {
+  const all = await db.select({ id: cards.id, content: cards.content }).from(cards);
+  for (const c of all) await syncLinks(c.id, c.content);
+  return all.length;
+}
+
 export async function createCard(input: CardInput) {
   const title = input.title.trim();
   const slug = await uniqueSlug(title);
@@ -80,16 +108,28 @@ export async function createCard(input: CardInput) {
       content: input.content ?? "",
       category: input.category?.trim() || "General",
       tags: (input.tags ?? []).map((t) => t.trim()).filter(Boolean),
+      kind: input.kind || "note",
     })
     .returning();
   await syncLinks(card.id, card.content);
   await relinkReferrers(card.title);
+  await snapshot(card);
+  await logEvent("created", card.id);
   return card;
 }
 
-export async function updateCard(id: number, input: Partial<CardInput>) {
+export async function updateCard(id: number, input: Partial<CardInput> & { isFavorite?: boolean }) {
   const [existing] = await db.select().from(cards).where(eq(cards.id, id)).limit(1);
   if (!existing) return null;
+
+  // Favorite flips do not create history revisions or edit events.
+  const definedKeys = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);
+  if (input.isFavorite !== undefined && definedKeys.every((k) => k === "isFavorite")) {
+    const [card] = await db.update(cards).set({ isFavorite: input.isFavorite }).where(eq(cards.id, id)).returning();
+    return card;
+  }
+
+  await snapshot(existing); // keep the old state before overwriting
   const title = input.title?.trim() || existing.title;
   const slug = title !== existing.title ? await uniqueSlug(title, id) : existing.slug;
   const [card] = await db
@@ -101,12 +141,15 @@ export async function updateCard(id: number, input: Partial<CardInput>) {
       content: input.content ?? existing.content,
       category: input.category?.trim() || existing.category,
       tags: input.tags ? input.tags.map((t) => t.trim()).filter(Boolean) : existing.tags,
+      kind: input.kind ?? existing.kind,
+      isFavorite: input.isFavorite ?? existing.isFavorite,
       updatedAt: new Date(),
     })
     .where(eq(cards.id, id))
     .returning();
   await syncLinks(card.id, card.content);
   if (title !== existing.title) await relinkReferrers(title);
+  await logEvent("edited", card.id);
   return card;
 }
 
@@ -117,6 +160,32 @@ export async function deleteCard(id: number) {
 export async function getCardBySlug(slug: string) {
   const [card] = await db.select().from(cards).where(eq(cards.slug, slug)).limit(1);
   return card ?? null;
+}
+
+export async function getRevisions(cardId: number) {
+  return db
+    .select()
+    .from(cardRevisions)
+    .where(eq(cardRevisions.cardId, cardId))
+    .orderBy(desc(cardRevisions.createdAt));
+}
+
+export async function restoreRevision(cardId: number, revisionId: number) {
+  const [rev] = await db
+    .select()
+    .from(cardRevisions)
+    .where(and(eq(cardRevisions.id, revisionId), eq(cardRevisions.cardId, cardId)))
+    .limit(1);
+  if (!rev) return null;
+  // updateCard snapshots the current state first, so restore is reversible.
+  return updateCard(cardId, {
+    title: rev.title,
+    summary: rev.summary,
+    content: rev.content,
+    category: rev.category,
+    tags: rev.tags,
+    kind: rev.kind,
+  });
 }
 
 export async function getCardContext(cardId: number, category: string, tags: string[]) {
@@ -156,7 +225,9 @@ export async function getCardContext(cardId: number, category: string, tags: str
   return { outgoing, backlinks, related, boards };
 }
 
-export async function listCards(opts: { q?: string; category?: string; tag?: string; letter?: string } = {}) {
+export async function listCards(
+  opts: { q?: string; category?: string; tag?: string; letter?: string; kind?: string; favorite?: boolean } = {},
+) {
   const conds = [];
   if (opts.q) {
     const p = `%${opts.q}%`;
@@ -164,21 +235,35 @@ export async function listCards(opts: { q?: string; category?: string; tag?: str
   }
   if (opts.category) conds.push(eq(cards.category, opts.category));
   if (opts.tag) conds.push(sql`${opts.tag} = ANY(${cards.tags})`);
+  if (opts.kind) conds.push(eq(cards.kind, opts.kind));
+  if (opts.favorite) conds.push(eq(cards.isFavorite, true));
   if (opts.letter) {
     if (opts.letter === "#") conds.push(sql`upper(left(${cards.title},1)) !~ '[A-Z]'`);
     else conds.push(ilike(cards.title, `${opts.letter}%`));
   }
-  return db
+  const rows = await db
     .select()
     .from(cards)
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(cards.title);
+  // Rank: title match > summary match > content match (then alphabetical).
+  if (opts.q) {
+    const q = normalizeTitle(opts.q);
+    const rank = (c: (typeof rows)[number]) =>
+      normalizeTitle(c.title).includes(q) ? 0 : normalizeTitle(c.summary).includes(q) ? 1 : 2;
+    rows.sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title));
+  }
+  return rows;
 }
 
 export async function getStats() {
   const [{ cardCount }] = await db.select({ cardCount: sql<number>`count(*)::int` }).from(cards);
   const [{ linkCount }] = await db.select({ linkCount: sql<number>`count(*)::int` }).from(links);
   const [{ boardCount }] = await db.select({ boardCount: sql<number>`count(*)::int` }).from(whiteboards);
+  const [{ favoriteCount }] = await db
+    .select({ favoriteCount: sql<number>`count(*)::int` })
+    .from(cards)
+    .where(eq(cards.isFavorite, true));
   const categories = await db
     .select({ category: cards.category, count: sql<number>`count(*)::int` })
     .from(cards)
@@ -188,6 +273,12 @@ export async function getStats() {
     sql`select t as tag, count(*)::int as count from ${cards}, unnest(${cards.tags}) as t group by t order by count desc, t asc limit 30`,
   );
   const recent = await db.select().from(cards).orderBy(desc(cards.updatedAt)).limit(6);
+  const favorites = await db
+    .select({ id: cards.id, title: cards.title, slug: cards.slug, summary: cards.summary, category: cards.category })
+    .from(cards)
+    .where(eq(cards.isFavorite, true))
+    .orderBy(cards.title)
+    .limit(8);
   const hubs = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug, category: cards.category, n: sql<number>`count(${links.id})::int` })
     .from(cards)
@@ -195,5 +286,5 @@ export async function getStats() {
     .groupBy(cards.id)
     .orderBy(desc(sql`count(${links.id})`))
     .limit(5);
-  return { cardCount, linkCount, boardCount, categories, tags: tagRows.rows, recent, hubs };
+  return { cardCount, linkCount, boardCount, favoriteCount, categories, tags: tagRows.rows, recent, favorites, hubs };
 }
