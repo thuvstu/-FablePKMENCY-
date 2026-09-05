@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --color-paper: #faf7f1;
+  --color-ink: #1f1b16;
+  --color-accent: #b4532a;
+}
+
+:root {
+  --paper: #faf7f1;
+  --ink: #1f1b16;
+  --accent: #b4532a;
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.paper-grid {
+  background-color: #f6f2ea;
+  background-image:
+    radial-gradient(circle, rgba(31, 27, 22, 0.16) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Encyclopedia prose                                                        */
+/* ------------------------------------------------------------------------ */
+.prose-codex {
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: #2a2520;
+}
+.prose-codex > :first-child {
+  margin-top: 0;
+}
+.prose-codex h1 {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  line-height: 1.15;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e3ddd1;
+  letter-spacing: -0.01em;
+}
+.prose-codex h2 {
+  font-family: var(--font-serif);
+  font-size: 1.55rem;
+  font-weight: 600;
+  margin: 2rem 0 0.6rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #ebe6dc;
+}
+.prose-codex h3 {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.4rem;
+}
+.prose-codex h4 {
+  font-weight: 600;
+  margin: 1.2rem 0 0.3rem;
+}
+.prose-codex p {
+  margin: 0 0 1rem;
+}
+.prose-codex ul,
+.prose-codex ol {
+  margin: 0 0 1rem 1.5rem;
+}
+.prose-codex ul {
+  list-style: disc;
+}
+.prose-codex ol {
+  list-style: decimal;
+}
+.prose-codex li {
+  margin: 0.25rem 0;
+}
+.prose-codex blockquote {
+  margin: 1.25rem 0;
+  padding: 0.5rem 1.25rem;
+  border-left: 3px solid var(--accent);
+  background: #f3ede2;
+  font-style: italic;
+  color: #4a423a;
+}
+.prose-codex code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: #efe9de;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.prose-codex pre {
+  background: #2a2520;
+  color: #f4efe6;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 0 0 1rem;
+}
+.prose-codex pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.prose-codex hr {
+  border: 0;
+  border-top: 1px solid #e3ddd1;
+  margin: 1.5rem 0;
+}
+.prose-codex mark {
+  background: #fde68a;
+  padding: 0 0.15em;
+  border-radius: 3px;
+}
+.prose-codex strong {
+  color: #171310;
+}
+
+.prose-compact {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.prose-compact h1 {
+  display: none;
+}
+.prose-compact h2,
+.prose-compact h3 {
+  font-size: 0.95rem;
+  margin: 0.75rem 0 0.25rem;
+  border: 0;
+}
+.prose-compact p {
+  margin: 0 0 0.5rem;
+}
+.prose-compact ul,
+.prose-compact ol {
+  margin: 0 0 0.5rem 1.1rem;
+}
+.prose-compact blockquote {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.75rem;
+}
+
+.wikilink {
+  color: #1d4ed8;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(29, 78, 216, 0.3);
+  transition: background 0.15s;
+}
+.wikilink:hover {
+  background: #dbeafe;
+  border-bottom-color: #1d4ed8;
+}
+.wikilink-missing {
+  color: #b91c1c;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(185, 28, 28, 0.5);
+}
+.wikilink-missing:hover {
+  background: #fee2e2;
+}
+.extlink {
+  color: #0f766e;
+  text-decoration: underline;
+}
+
+/* Scrollbar for side panels */
+.thin-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: #d8d0c2;
+  border-radius: 8px;
+}
