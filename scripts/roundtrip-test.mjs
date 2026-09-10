@@ -53,6 +53,7 @@ async function snapshot() {
     placements += detail.cards.length;
     boardEdges += detail.edges.length;
   }
+  const sync = await jget("/api/sync");
   return {
     cards: cards.length,
     links: graph.edges.length,
@@ -60,7 +61,22 @@ async function snapshot() {
     boards: boards.length,
     placements,
     boardEdges,
+    tombstones: sync.tombstones,
   };
+}
+
+/** Replication check: pull → push must be a no-op (idempotent, LWW). */
+async function syncIdempotencyCheck() {
+  const pull = await jget("/api/sync/pull");
+  if (!Array.isArray(pull.cards) || !pull.cards.every((c) => typeof c.uid === "string" && c.uid.length > 0)) {
+    throw new Error("pull payload is missing stable uids");
+  }
+  const before = await snapshot();
+  await jsend("/api/sync/push", "POST", pull);
+  await jsend("/api/sync/push", "POST", pull); // twice: must still be a no-op
+  const after = await snapshot();
+  for (const k of Object.keys(before)) check(`sync no-op · ${k}`, before[k], after[k]);
+  return pull.cards.length;
 }
 
 async function wipeAll() {
@@ -80,6 +96,12 @@ try {
   await jget("/api/health");
   console.log("✓ server healthy");
 
+  // Start from a deterministic state: no leftover tombstones from earlier runs.
+  await jsend("/api/maintenance/purge", "POST");
+
+  const pulled = await syncIdempotencyCheck();
+  console.log(`✓ sync pull/push idempotent over ${pulled} cards`);
+
   const before = await snapshot();
   console.log("baseline:", JSON.stringify(before));
 
@@ -91,10 +113,12 @@ try {
   }
   console.log(`✓ exported ${exported.cards.length} cards, ${exported.links.length} links, ${exported.boards.length} boards (backup: ${BACKUP_PATH})`);
 
-  // 2. Wipe everything
+  // 2. Wipe everything. Deletes are soft, so they must leave tombstones behind
+  //    (that is what makes deletion propagate to other replicas).
   await wipeAll();
   const afterWipe = await snapshot();
-  check("cards after wipe", 0, afterWipe.cards);
+  check("live cards after wipe", 0, afterWipe.cards);
+  check("tombstones recorded by wipe", before.cards, afterWipe.tombstones);
   if (afterWipe.cards !== 0) throw new Error("wipe incomplete");
 
   // 3. Import the export verbatim
@@ -104,7 +128,11 @@ try {
   check("imported links", exported.links.length, result.links);
   check("imported boards", exported.boards.length, result.boards);
 
-  // 4. Compare full state
+  // 4. Drop the wipe's tombstones so the comparison is against live state only
+  //    (purge is exactly what a user runs once every replica has synced).
+  await jsend("/api/maintenance/purge", "POST");
+
+  // 5. Compare full state
   const after = await snapshot();
   console.log(comparing(before, after));
   function comparing(a, b) {
@@ -118,6 +146,7 @@ try {
   check("boards", before.boards, after.boards);
   check("board placements", before.placements, after.placements);
   check("board edges", before.boardEdges, after.boardEdges);
+  check("tombstones", before.tombstones, after.tombstones);
 } catch (e) {
   console.error(`\n✗ FAIL (exception): ${e.message}`);
   console.error("attempting backup restore…");

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { cards as cardsTable, linkCandidates, links, whiteboardCards, whiteboardEdges, whiteboards } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createCard, relinkAll } from "./cards";
 import { sql } from "drizzle-orm";
 
@@ -24,7 +24,7 @@ type ExportCard = {
 };
 
 export async function exportAll() {
-  const allCards = await db.select().from(cardsTable).orderBy(cardsTable.title);
+  const allCards = await db.select().from(cardsTable).where(isNull(cardsTable.deletedAt)).orderBy(cardsTable.title);
   const slugById = new Map(allCards.map((c) => [c.id, c.slug]));
   const boards = await db.select().from(whiteboards);
   const bCards = await db.select().from(whiteboardCards);
@@ -254,7 +254,7 @@ export async function toSqliteDump(): Promise<string> {
 
 /** Single Markdown document with YAML front matter per entry (レガシー互換の読み物形式). */
 export async function toMarkdownBook(): Promise<string> {
-  const all = await db.select().from(cardsTable).orderBy(cardsTable.title);
+  const all = await db.select().from(cardsTable).where(isNull(cardsTable.deletedAt)).orderBy(cardsTable.title);
   const parts: string[] = [
     "---",
     `title: Codex Export`,

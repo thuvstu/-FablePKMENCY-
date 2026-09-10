@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { cards } from "@/db/schema";
 import CardEditor from "@/components/CardEditor";
-import { getCardBySlug } from "@/lib/cards";
+import { alive, getCardBySlug } from "@/lib/cards";
 import { sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +13,8 @@ export default async function EditCardPage({ params }: { params: Promise<{ slug:
   const card = await getCardBySlug(slug);
   if (!card) notFound();
   const [all, cats] = await Promise.all([
-    db.select({ title: cards.title, slug: cards.slug }).from(cards).orderBy(cards.title),
-    db.select({ category: cards.category }).from(cards).groupBy(cards.category).orderBy(sql`count(*) desc`),
+    db.select({ title: cards.title, slug: cards.slug }).from(cards).where(alive).orderBy(cards.title),
+    db.select({ category: cards.category }).from(cards).where(alive).groupBy(cards.category).orderBy(sql`count(*) desc`),
   ]);
   return (
     <main className="mx-auto max-w-7xl px-4 py-8">

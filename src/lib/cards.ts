@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { cardRevisions, cards, linkCandidates, links, progressEvents, whiteboardCards, whiteboards } from "@/db/schema";
 import { alias } from "drizzle-orm/pg-core";
-import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { extractWikiLinks, normalizeTitle, slugify } from "./wiki";
 
 export type CardInput = {
@@ -15,6 +15,9 @@ export type CardInput = {
 };
 
 export type EventType = "created" | "edited" | "reviewed" | "connected";
+
+/** Tombstones stay in the table for sync; every read path filters them out. */
+export const alive = isNull(cards.deletedAt);
 
 /** Append to the unbounded activity log (feeds streaks / heatmap). */
 export async function logEvent(type: EventType, cardId?: number) {
@@ -43,7 +46,7 @@ async function uniqueSlug(title: string, excludeId?: number) {
     const existing = await db
       .select({ id: cards.id })
       .from(cards)
-      .where(eq(cards.slug, slug))
+      .where(and(eq(cards.slug, slug), alive))
       .limit(1);
     if (existing.length === 0 || existing[0].id === excludeId) return slug;
     slug = `${base}-${n++}`;
@@ -60,7 +63,7 @@ export async function resolveLinkTargets(content: string): Promise<Map<string, n
   const rows = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug })
     .from(cards)
-    .where(or(inArray(sql`lower(${cards.title})`, lowered), inArray(cards.slug, slugs)));
+    .where(and(alive, or(inArray(sql`lower(${cards.title})`, lowered), inArray(cards.slug, slugs))));
   for (const t of titles) {
     const hit =
       rows.find((r) => normalizeTitle(r.title) === normalizeTitle(t)) ??
@@ -154,7 +157,7 @@ export async function listCandidates(status = "pending") {
     .from(linkCandidates)
     .innerJoin(cards, eq(cards.id, linkCandidates.sourceId))
     .innerJoin(t, eq(t.id, linkCandidates.targetId))
-    .where(eq(linkCandidates.status, status))
+    .where(and(eq(linkCandidates.status, status), isNull(cards.deletedAt), isNull(t.deletedAt)))
     .orderBy(desc(linkCandidates.createdAt));
 }
 
@@ -198,13 +201,13 @@ export async function relinkReferrers(title: string) {
   const referrers = await db
     .select({ id: cards.id, content: cards.content })
     .from(cards)
-    .where(ilike(cards.content, pattern));
+    .where(and(alive, ilike(cards.content, pattern)));
   for (const r of referrers) await syncLinks(r.id, r.content);
 }
 
 /** Rebuild the entire link graph (maintenance operation). */
 export async function relinkAll() {
-  const all = await db.select({ id: cards.id, content: cards.content }).from(cards);
+  const all = await db.select({ id: cards.id, content: cards.content }).from(cards).where(alive);
   for (const c of all) await syncLinks(c.id, c.content);
   return all.length;
 }
@@ -275,12 +278,33 @@ export async function updateCard(id: number, input: Partial<CardInput> & { isFav
   return card;
 }
 
+/**
+ * Soft delete (PE entry.deletedAt): the row survives as a tombstone so the
+ * deletion can propagate to other replicas. Derived rows (links, candidates,
+ * board placements) are removed because they are not independently meaningful.
+ * The slug is released so the title can be written again later.
+ */
 export async function deleteCard(id: number) {
-  await db.delete(cards).where(eq(cards.id, id));
+  const [existing] = await db.select().from(cards).where(eq(cards.id, id)).limit(1);
+  if (!existing || existing.deletedAt) return;
+  await db.delete(links).where(or(eq(links.sourceId, id), eq(links.targetId, id)));
+  await db.delete(linkCandidates).where(or(eq(linkCandidates.sourceId, id), eq(linkCandidates.targetId, id)));
+  await db.delete(whiteboardCards).where(eq(whiteboardCards.cardId, id));
+  const now = new Date();
+  await db
+    .update(cards)
+    .set({ deletedAt: now, updatedAt: now, slug: `${existing.slug}--deleted-${id}` })
+    .where(eq(cards.id, id));
+}
+
+/** Permanently drop tombstones (hygiene; run only when replicas are in sync). */
+export async function purgeTombstones() {
+  const rows = await db.delete(cards).where(sql`${cards.deletedAt} is not null`).returning({ id: cards.id });
+  return rows.length;
 }
 
 export async function getCardBySlug(slug: string) {
-  const [card] = await db.select().from(cards).where(eq(cards.slug, slug)).limit(1);
+  const [card] = await db.select().from(cards).where(and(eq(cards.slug, slug), alive)).limit(1);
   return card ?? null;
 }
 
@@ -316,17 +340,18 @@ export async function getCardContext(cardId: number, category: string, tags: str
     .select({ id: cards.id, title: cards.title, slug: cards.slug, summary: cards.summary, category: cards.category })
     .from(links)
     .innerJoin(cards, eq(cards.id, links.targetId))
-    .where(eq(links.sourceId, cardId));
+    .where(and(eq(links.sourceId, cardId), alive));
   const backlinks = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug, summary: cards.summary, category: cards.category })
     .from(links)
     .innerJoin(cards, eq(cards.id, links.sourceId))
-    .where(eq(links.targetId, cardId));
+    .where(and(eq(links.targetId, cardId), alive));
   const relatedRaw = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug, summary: cards.summary, category: cards.category, tags: cards.tags })
     .from(cards)
     .where(
       and(
+        alive,
         ne(cards.id, cardId),
         tags.length
           ? or(eq(cards.category, category), sql`${cards.tags} && ${sql.raw(`ARRAY[${tags.map((t) => `'${t.replace(/'/g, "''")}'`).join(",")}]::text[]`)}`)
@@ -357,7 +382,7 @@ export async function getCardContext(cardId: number, category: string, tags: str
 export async function listCards(
   opts: { q?: string; category?: string; tag?: string; letter?: string; kind?: string; favorite?: boolean } = {},
 ) {
-  const conds = [];
+  const conds = [alive];
   if (opts.category) conds.push(eq(cards.category, opts.category));
   if (opts.tag) conds.push(sql`${opts.tag} = ANY(${cards.tags})`);
   if (opts.kind) conds.push(eq(cards.kind, opts.kind));
@@ -411,7 +436,8 @@ export async function listCards(
       }
     }
     conds.push(
-      or(ilike(cards.title, p), ilike(cards.summary, p), ilike(cards.content, p), sql`exists (select 1 from unnest(${cards.aliases}) as a where a ilike ${p})`),
+      sql`(${cards.title} ilike ${p} or ${cards.summary} ilike ${p} or ${cards.content} ilike ${p}
+        or exists (select 1 from unnest(${cards.aliases}) as a where a ilike ${p}))`,
     );
   }
 
@@ -436,32 +462,34 @@ export async function listCards(
 }
 
 export async function getStats() {
-  const [{ cardCount }] = await db.select({ cardCount: sql<number>`count(*)::int` }).from(cards);
+  const [{ cardCount }] = await db.select({ cardCount: sql<number>`count(*)::int` }).from(cards).where(alive);
   const [{ linkCount }] = await db.select({ linkCount: sql<number>`count(*)::int` }).from(links);
   const [{ boardCount }] = await db.select({ boardCount: sql<number>`count(*)::int` }).from(whiteboards);
   const [{ favoriteCount }] = await db
     .select({ favoriteCount: sql<number>`count(*)::int` })
     .from(cards)
-    .where(eq(cards.isFavorite, true));
+    .where(and(alive, eq(cards.isFavorite, true)));
   const categories = await db
     .select({ category: cards.category, count: sql<number>`count(*)::int` })
     .from(cards)
+    .where(alive)
     .groupBy(cards.category)
     .orderBy(desc(sql`count(*)`));
   const tagRows = await db.execute<{ tag: string; count: number }>(
-    sql`select t as tag, count(*)::int as count from ${cards}, unnest(${cards.tags}) as t group by t order by count desc, t asc limit 30`,
+    sql`select t as tag, count(*)::int as count from ${cards}, unnest(${cards.tags}) as t where ${cards.deletedAt} is null group by t order by count desc, t asc limit 30`,
   );
-  const recent = await db.select().from(cards).orderBy(desc(cards.updatedAt)).limit(6);
+  const recent = await db.select().from(cards).where(alive).orderBy(desc(cards.updatedAt)).limit(6);
   const favorites = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug, summary: cards.summary, category: cards.category })
     .from(cards)
-    .where(eq(cards.isFavorite, true))
+    .where(and(alive, eq(cards.isFavorite, true)))
     .orderBy(cards.title)
     .limit(8);
   const hubs = await db
     .select({ id: cards.id, title: cards.title, slug: cards.slug, category: cards.category, n: sql<number>`count(${links.id})::int` })
     .from(cards)
     .leftJoin(links, eq(links.targetId, cards.id))
+    .where(alive)
     .groupBy(cards.id)
     .orderBy(desc(sql`count(${links.id})`))
     .limit(5);

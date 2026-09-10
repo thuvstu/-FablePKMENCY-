@@ -15,6 +15,10 @@ import {
   Shuffle,
   Star,
   Search,
+  Link2,
+  Zap,
+  RefreshCw,
+  Layers,
 } from "lucide-react";
 import { kindMeta } from "@/lib/wiki";
 
@@ -23,15 +27,19 @@ type Hit = { id: number; title: string; slug: string; summary: string; category:
 type Action = { id: string; label: string; hint?: string; href: string; icon: React.ReactNode };
 
 const ACTIONS: Action[] = [
+  { id: "capture", label: "入力コンソール（PC から記録）", href: "/capture", icon: <Zap size={15} /> },
   { id: "home", label: "百科事典トップ", href: "/", icon: <BookOpen size={15} /> },
   { id: "boards", label: "ホワイトボード一覧", href: "/boards", icon: <LayoutDashboard size={15} /> },
   { id: "graph", label: "知識グラフ", href: "/graph", icon: <Network size={15} /> },
   { id: "review", label: "復習セッションを開始", href: "/review", icon: <GraduationCap size={15} /> },
+  { id: "connections", label: "接続の候補（承認制）", href: "/connections", icon: <Link2 size={15} /> },
   { id: "stats", label: "学習統計", href: "/stats", icon: <BarChart3 size={15} /> },
   { id: "timeline", label: "タイムライン", href: "/timeline", icon: <Clock size={15} /> },
   { id: "random", label: "ランダムなエントリ", href: "/random", icon: <Shuffle size={15} /> },
   { id: "favorites", label: "お気に入り", href: "/?fav=1", icon: <Star size={15} /> },
   { id: "settings", label: "データ管理（エクスポート/インポート）", href: "/settings", icon: <Settings size={15} /> },
+  { id: "sync", label: "同期（PE ⇄ Codex）", href: "/sync", icon: <RefreshCw size={15} /> },
+  { id: "schema", label: "スキーマ契約（SQLite / PostgreSQL）", href: "/schema", icon: <Layers size={15} /> },
 ];
 
 export default function CommandPalette() {

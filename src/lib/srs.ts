@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { cards, reviews } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, isNull, sql } from "drizzle-orm";
 import { logEvent } from "./cards";
 
 // ---------------------------------------------------------------------------
@@ -88,7 +88,8 @@ export async function getDueQueue(limit = 40): Promise<{ due: DueCard[]; todayRe
       category: cards.category,
       kind: cards.kind,
     })
-    .from(cards);
+    .from(cards)
+    .where(isNull(cards.deletedAt));
   const states = await latestStates();
   const now = Date.now();
   const due: DueCard[] = [];

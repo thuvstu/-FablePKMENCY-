@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, LayoutDashboard, Network, GraduationCap, BarChart3, Shuffle, Search, Plus, Link2 } from "lucide-react";
+import { BookOpen, LayoutDashboard, Network, GraduationCap, BarChart3, Shuffle, Search, Zap, Link2 } from "lucide-react";
 
 const items = [
   { href: "/", label: "百科事典", icon: BookOpen },
@@ -91,11 +91,12 @@ export default function Nav() {
             <kbd className="hidden rounded border border-[#e6e0d4] bg-[#faf7f1] px-1 text-[10px] lg:inline">⌘K</kbd>
           </button>
           <Link
-            href="/new"
+            href="/capture"
+            title="PC 入力コンソール（摩擦ゼロで記録）"
             className="flex items-center gap-1 rounded-md bg-[#b4532a] px-3 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-[#9a4522]"
           >
-            <Plus size={14} />
-            <span className="hidden sm:inline">新規カード</span>
+            <Zap size={14} />
+            <span className="hidden sm:inline">入力</span>
           </Link>
         </form>
       </div>

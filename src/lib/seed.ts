@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { cards, whiteboardCards, whiteboardEdges, whiteboards } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import { createCard } from "./cards";
 
 type SeedCard = { title: string; category: string; tags: string[]; summary: string; content: string };
@@ -420,7 +420,7 @@ const BOARDS: {
 ];
 
 export async function seedIfEmpty() {
-  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(cards);
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(cards).where(isNull(cards.deletedAt));
   if (n > 0) return false;
 
   const idByTitle = new Map<string, number>();

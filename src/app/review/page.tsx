@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { cards } from "@/db/schema";
 import ReviewSession from "@/components/ReviewSession";
 import { getDueQueue } from "@/lib/srs";
+import { isNull } from "drizzle-orm";
 import { GraduationCap } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ReviewPage() {
   const [{ due, todayReviewed, totalReviewed }, titles] = await Promise.all([
     getDueQueue(),
-    db.select({ title: cards.title, slug: cards.slug }).from(cards),
+    db.select({ title: cards.title, slug: cards.slug }).from(cards).where(isNull(cards.deletedAt)),
   ]);
 
   return (

@@ -6,7 +6,7 @@ import { Markdown } from "@/components/Markdown";
 import DeleteCardButton from "@/components/DeleteCardButton";
 import FavoriteButton from "@/components/FavoriteButton";
 import CandidateActions from "@/components/CandidateActions";
-import { getCardBySlug, getCardContext, listCandidatesForCard } from "@/lib/cards";
+import { alive, getCardBySlug, getCardContext, listCandidatesForCard } from "@/lib/cards";
 import { categoryClass, kindMeta, normalizeTitle, slugify } from "@/lib/wiki";
 import { History, Link2Icon } from "lucide-react";
 
@@ -52,7 +52,7 @@ export default async function WikiPage({ params }: { params: Promise<{ slug: str
 
   const [ctx, all, pendingForCard] = await Promise.all([
     getCardContext(card.id, card.category, card.tags),
-    db.select({ title: cards.title, slug: cards.slug }).from(cards),
+    db.select({ title: cards.title, slug: cards.slug }).from(cards).where(alive),
     listCandidatesForCard(card.id),
   ]);
   const byTitle = new Map(all.map((c) => [normalizeTitle(c.title), c.slug]));

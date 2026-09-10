@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { cards } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import { getStats, listCards } from "@/lib/cards";
 import { seedIfEmpty } from "@/lib/seed";
 import { getDueQueue } from "@/lib/srs";
@@ -29,7 +29,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const [stats, entries, kindRows, dueInfo] = await Promise.all([
     getStats(),
     listCards({ q: sp.q, category: sp.category, tag: sp.tag, letter: sp.letter, kind: sp.kind, favorite: sp.fav === "1" }),
-    db.select({ kind: cards.kind, count: sql<number>`count(*)::int` }).from(cards).groupBy(cards.kind),
+    db.select({ kind: cards.kind, count: sql<number>`count(*)::int` }).from(cards).where(isNull(cards.deletedAt)).groupBy(cards.kind),
     getDueQueue(),
   ]);
 

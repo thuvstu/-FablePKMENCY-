@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { cards, links, progressEvents, reviews } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { seedIfEmpty } from "@/lib/seed";
 import { getDueQueue } from "@/lib/srs";
 import { getStats } from "@/lib/cards";
@@ -20,13 +20,14 @@ export default async function StatsPage() {
   const [basis, dueInfo, allCards, dayRows, kindRows, reviewAgg] = await Promise.all([
     getStats(),
     getDueQueue(),
-    db.select({ title: cards.title, slug: cards.slug, content: cards.content }).from(cards),
+    db.select({ title: cards.title, slug: cards.slug, content: cards.content }).from(cards).where(isNull(cards.deletedAt)),
     db.execute<{ day: string; count: number }>(
       sql`select to_char(created_at, 'YYYY-MM-DD') as day, count(*)::int as count from ${progressEvents} group by day`,
     ),
     db
       .select({ kind: cards.kind, count: sql<number>`count(*)::int` })
       .from(cards)
+      .where(isNull(cards.deletedAt))
       .groupBy(cards.kind),
     db.execute<{ total: number; avgInterval: number | null; avgEase: number | null }>(sql`
       select count(*)::int as total,

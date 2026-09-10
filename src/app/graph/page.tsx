@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { cards, links } from "@/db/schema";
+import { isNull } from "drizzle-orm";
 import GraphView from "@/components/GraphView";
 import { seedIfEmpty } from "@/lib/seed";
 
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function GraphPage() {
   await seedIfEmpty();
   const [nodes, edges] = await Promise.all([
-    db.select({ id: cards.id, title: cards.title, slug: cards.slug, category: cards.category }).from(cards),
+    db.select({ id: cards.id, title: cards.title, slug: cards.slug, category: cards.category }).from(cards).where(isNull(cards.deletedAt)),
     db.select({ source: links.sourceId, target: links.targetId }).from(links),
   ]);
   return (

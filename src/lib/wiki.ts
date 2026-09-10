@@ -1,11 +1,23 @@
 export function slugify(input: string): string {
-  return input
+  const ascii = input
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "entry";
+    .slice(0, 80);
+  // 「日本語タイトルA」のように ASCII が数文字しか残らない場合も衝突しやすいので、
+  // 非ASCII を含むタイトルは必ずハッシュを添える。
+  const hasNonAscii = /[^\x00-\x7F]/.test(input);
+  if (ascii && !(hasNonAscii && ascii.length < 12)) return ascii;
+  // 非ASCII（日本語など）は音写できないので、タイトルから決定論的な短縮ハッシュを作る。
+  // 同じタイトル → 常に同じ slug なので [[wiki-link]] の解決にも使える。
+  let h = 2166136261;
+  for (const ch of input.trim()) {
+    h ^= ch.codePointAt(0) ?? 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return ascii ? `${ascii}-${h.toString(36)}` : `n-${h.toString(36)}`;
 }
 
 /** Extract all [[Target]] / [[Target|alias]] link targets from markdown. */

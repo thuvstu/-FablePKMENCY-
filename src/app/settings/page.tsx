@@ -1,13 +1,13 @@
 import { db } from "@/db";
 import { cardRevisions, cards, links, progressEvents, reviews, whiteboards } from "@/db/schema";
-import { sql } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import DataPanel from "@/components/DataPanel";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const counts = await Promise.all([
-    db.select({ n: sql<number>`count(*)::int` }).from(cards),
+    db.select({ n: sql<number>`count(*)::int` }).from(cards).where(isNull(cards.deletedAt)),
     db.select({ n: sql<number>`count(*)::int` }).from(links),
     db.select({ n: sql<number>`count(*)::int` }).from(cardRevisions),
     db.select({ n: sql<number>`count(*)::int` }).from(reviews),

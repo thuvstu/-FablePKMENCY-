@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { cards, whiteboardCards, whiteboardEdges, whiteboards } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import BoardCanvas from "@/components/BoardCanvas";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +37,12 @@ export default async function BoardPage({
       })
       .from(whiteboardCards)
       .innerJoin(cards, eq(cards.id, whiteboardCards.cardId))
-      .where(eq(whiteboardCards.whiteboardId, id)),
+      .where(and(eq(whiteboardCards.whiteboardId, id), isNull(cards.deletedAt))),
     db
       .select({ id: whiteboardEdges.id, fromCardId: whiteboardEdges.fromCardId, toCardId: whiteboardEdges.toCardId, label: whiteboardEdges.label })
       .from(whiteboardEdges)
       .where(eq(whiteboardEdges.whiteboardId, id)),
-    db.select({ title: cards.title, slug: cards.slug }).from(cards),
+    db.select({ title: cards.title, slug: cards.slug }).from(cards).where(isNull(cards.deletedAt)),
   ]);
 
   return (

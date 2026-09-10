@@ -17,6 +17,10 @@ export const cards = pgTable(
   "cards",
   {
     id: serial("id").primaryKey(),
+    /** Cross-device stable identity (SQLite/PE ⇄ PostgreSQL/Codex). Never reused. */
+    uid: text("uid")
+      .notNull()
+      .$defaultFn(() => crypto.randomUUID()),
     slug: text("slug").notNull(),
     title: text("title").notNull(),
     summary: text("summary").notNull().default(""),
@@ -29,8 +33,15 @@ export const cards = pgTable(
     isFavorite: boolean("is_favorite").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Tombstone (PE entry.deletedAt): deletions must be syncable, not silent. */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("cards_slug_idx").on(t.slug), index("cards_category_idx").on(t.category)],
+  (t) => [
+    uniqueIndex("cards_uid_idx").on(t.uid),
+    uniqueIndex("cards_slug_idx").on(t.slug),
+    index("cards_category_idx").on(t.category),
+    index("cards_updated_idx").on(t.updatedAt),
+  ],
 );
 
 // Directed wiki-links extracted from [[Title]] syntax in card content.
@@ -82,10 +93,14 @@ export const linkCandidates = pgTable(
 // ---------------------------------------------------------------------------
 export const whiteboards = pgTable("whiteboards", {
   id: serial("id").primaryKey(),
+  uid: text("uid")
+    .notNull()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 });
 
 export const whiteboardCards = pgTable(

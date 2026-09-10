@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { cards } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, isNull } from "drizzle-orm";
 import { seedIfEmpty } from "@/lib/seed";
 import { categoryClass, kindMeta } from "@/lib/wiki";
 import { Clock, Star } from "lucide-react";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function TimelinePage() {
   await seedIfEmpty();
-  const all = await db.select().from(cards).orderBy(desc(cards.updatedAt)).limit(200);
+  const all = await db.select().from(cards).where(isNull(cards.deletedAt)).orderBy(desc(cards.updatedAt)).limit(200);
 
   const groups = new Map<string, typeof all>();
   for (const c of all) {
